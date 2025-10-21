@@ -1,0 +1,9 @@
+https://github.com/hyperskill/hs-test-python/archive/release.tar.gz
+qdrant-client
+langchain-community
+langchain-core
+langchain-openai
+langchain-groq
+langchain-qdrant
+beautifulsoup4
+requests
