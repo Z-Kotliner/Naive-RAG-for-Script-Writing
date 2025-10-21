@@ -3,6 +3,8 @@ from ingestion import load_documents, chunk_document
 from data import scrap_movies_data
 from utils import clean_text
 from ingestion.embedder import embed_and_store_scenes
+from generation import rewrite_query
+from retrieval import retrieve_scenes
 
 
 def main():
@@ -38,7 +40,25 @@ def main():
     print(f"Found {len(chunked_script)} scenes in the script for {movie_title}.")
 
     # 10. Use the embeddings model to generate vector representations scene chunks
-    embed_and_store_scenes(chunked_script, movie_title)
+    qdrant_vs = embed_and_store_scenes(chunked_script, movie_title)
+
+    # 11. Get user query
+    print()
+    query = input(">").lower()
+
+    # 12. Re-write user query
+    rewritten_query = rewrite_query(query)
+
+    # 13. Print the re-written query
+    print(f'Rewritten query to: "{rewritten_query}."')
+    print()
+
+    # 14. Search query
+    results = retrieve_scenes(rewritten_query, qdrant_vs)
+
+    # 15. Print results
+    for index, result in enumerate(results, start=1):
+        print(f"Scene {index}: {result.page_content}")
 
 
 if __name__ == "__main__":

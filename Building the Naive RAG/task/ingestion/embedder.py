@@ -1,10 +1,11 @@
-from langchain_huggingface import HuggingFaceEndpointEmbeddings
 import os
-from qdrant_client.models import VectorParams, Distance
-from langchain_core.documents import Document
-from langchain_qdrant import QdrantVectorStore, Qdrant
-from qdrant_client import QdrantClient
+
 import dotenv
+from langchain_core.documents import Document
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
+from langchain_qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
+from qdrant_client.models import VectorParams, Distance
 
 # Load API keys as environment variables
 dotenv.load_dotenv()
@@ -51,3 +52,5 @@ def embed_and_store_scenes(scene_list, movie_title):
 
     # Inform user
     print(f"Embedded script for {movie_title}.")
+
+    return qdrant_vs

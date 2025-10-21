@@ -5,7 +5,7 @@ movies = {}
 
 
 def scrap_movies_data(base_url) -> dict[int, str]:
-    # Retrieve all movies from IMSDb
+    # Collect all movies from IMSDb
     try:
         response = requests.get(base_url)
         response.raise_for_status()
