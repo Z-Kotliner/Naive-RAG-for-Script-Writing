@@ -1,58 +1,48 @@
-import os
-
-os.environ[
-    'USER_AGENT'] = "'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
-
-import requests
-from bs4 import BeautifulSoup
-from langchain_community.document_loaders import IMSDbLoader
-
-base_url = "https://imsdb.com/all-scripts.html"
-scripts_base_url = "https://imsdb.com/scripts/"
-
-movies = {}
+from config import SCRIPTS_BASE_URL, MOVIES_BASE_URL
+from ingestion import load_documents, chunk_document
+from data import scrap_movies_data
+from utils import clean_text
 
 
 def main():
-    # Retrieve all movies from IMSDb
-    try:
-        response = requests.get(base_url)
-        response.raise_for_status()
-        # Parse it using BeautifulSoup & display movies list
-        soup = BeautifulSoup(response.content, "html.parser")
-        paragraphs = soup.find_all("p")
-        for index, paragraph in enumerate(paragraphs):
-            movie_link = paragraph.find("a")
-            movies[index] = movie_link.text
-            print(f"{index}. {movie_link.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"Error retrieving data from imsdb.com. {e}")
+    # 1. Collect movie title
+    movies = scrap_movies_data(MOVIES_BASE_URL)
+    for index, title in enumerate(movies, start=1):
+        print(f"{index}. {title}")
 
-        print()
+    print()
 
-    # Accept user search for movie
-    movie_title = input()
+    # 2. Accept user search for movie
+    movie_title = input(">")
 
-    # verify input
+    # 3. verify input
     if movie_title == "" or movie_title not in movies.values():
         print(f"Script for {movie_title} wasn't found in the list of movie scripts.")
         exit(0)
 
-    # Construct full script URL
+    # 4. Construct full script URL
     path = movie_title.strip().replace(" ", "-") + ".html"
-    movie_url = f"{scripts_base_url}{path}"
-    # print(f"Movie URL: {movie_url}")
+    script_url = f"{SCRIPTS_BASE_URL}{path}"
 
-    # Load the movie's Script using LangChain - IMSDbLoader
-    loader = IMSDbLoader(movie_url)
-    data = loader.load()
-    content = data[0].page_content
+    # 5. Load the movie's Script using LangChain - IMSDbLoader
+    movie_script = load_documents(script_url)
 
-    # Print the loaded movie + full url + script
-    print("Loaded script for", movie_title, "from", movie_url + ".")
+    # 6. Clear script text
+    cleaned_movie_script = clean_text(movie_script)
 
-    # Print Script
-    print(content)
+    # 7. Chunk script document
+    chunked_script = chunk_document(cleaned_movie_script, 500, 10)
+
+    # 8. Print the loaded movie + full url + script
+    print("Loaded script for", movie_title, "from", script_url + ".")
+    print()
+
+    # 9. Display the number of split chunks
+    print(f"Found {len(chunked_script)} scenes in the script for {movie_title}.")
+
+    # 10. Display each scene chunk line by line
+    for index, scene in enumerate(chunked_script, start=1):
+        print(f"Scene {index}: {scene}")
 
 
 if __name__ == "__main__":

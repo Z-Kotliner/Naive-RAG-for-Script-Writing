@@ -1,0 +1,1 @@
+from .collector import scrap_movies_data
