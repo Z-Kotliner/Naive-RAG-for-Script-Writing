@@ -1,71 +1,124 @@
+import qdrant_client.http.exceptions
 from hstest import StageTest, TestedProgram, CheckResult, dynamic_test
-import re
+import requests
+import json
 
-class MovieQAToolTest(StageTest):
-    # Each tuple: (movie title, expected scene count, expected info regex, expected keywords regex)
+class RAGTest(StageTest):
     test_data = [
+        (
+            "BlacKkKlansman",
+            113,
+            "https://imsdb.com/scripts/BlacKkKlansman.html",
+        ),
         (
             "Mission Impossible",
             129,
-            r"Loaded script for Mission Impossible from https://imsdb\.com/scripts/Mission-Impossible\.html\.",
-            r"KITTRIDGE|ETHAN|LUTHER|CLAIRE|INT|EXT|CUT|CIA|TRAIN"
-        ),
-        (
-            "Batman",
-            127,
-            r"Loaded script for Batman from https://imsdb\.com/scripts/Batman\.html\.",
-            r"Gotham|Joker|Eddie|Nick|Knox|INT|CUT|EXT|Bruce Wayne"
-        ),
-        (
-            "Titanic",
-            109,
-            r"Loaded script for Titanic from https://imsdb\.com/scripts/Titanic\.html\.",
-            r"JACK|ROSE|CAL|FABRIZIO|INT|EXT|CUT|SHIP"
+            "https://imsdb.com/scripts/Mission-Impossible.html",
         ),
         (
             "Wonder Woman",
             55,
-            r"Loaded script for Wonder Woman from https://imsdb\.com/scripts/Wonder-Woman\.html\.",
-            r"WONDER WOMAN|DIANA|STEVE|Ares|EXT|INT|CUT|ISLAND|TRENCH",
+            "https://imsdb.com/scripts/Wonder-Woman.html",
         )
     ]
 
+    @staticmethod
+    def check_qdrant_connection():
+        """Checks connectivity with the Qdrant server."""
+        try:
+            response = requests.get("http://localhost:6333/collections")
+            if response.status_code != 200:
+                return "Cannot connect to the Qdrant server. Make sure it is running."
+        except (requests.ConnectionError, requests.exceptions.RequestException):
+            return "Cannot connect to the Qdrant server. Make sure it is running."
+        except Exception as e:
+            return f"An error occurred while connecting to the Qdrant server. Encountered: {e}!"
+        return None
+
+    @staticmethod
+    def verify_qdrant_collection(collection):
+        """Validates the Qdrant collection for the given movie."""
+        try:
+            response = requests.get(f"http://localhost:6333/collections/{collection}")
+            data = response.json()
+        except qdrant_client.http.exceptions.UnexpectedResponse as e:
+            return f"Unable to create a collection for the script of {collection.replace('-', ' ')}. Encountered: {e}"
+        except qdrant_client.http.exceptions.ResponseHandlingException as e:
+            return f"Cannot connect to the Qdrant server. Make sure it is running. Encountered: {e}"
+        except json.JSONDecodeError:
+            return "Response is not valid JSON."
+        except Exception as e:
+            return f"An error occurred while loading the collection for {collection.replace('-', ' ')}. Encountered: {e}!"
+
+        expected_keys = {'status', 'time', 'result'}
+        if not expected_keys.issubset(data.keys()):
+            return f"Response JSON does not contain the expected keys: {expected_keys}"
+        if data.get('status') != 'ok':
+            return f"Expected status 'ok', but got '{data.get('status')}'"
+
+        result = data.get('result', {})
+        config = result.get('config')
+        if not isinstance(config, dict):
+            return "'config' is not a dictionary in 'result'"
+        params = config.get('params')
+        if not isinstance(params, dict):
+            return "'params' is missing or not a dictionary in 'config'"
+        vectors = params.get('vectors')
+        if not isinstance(vectors, dict):
+            return "'vectors' is missing or not a dictionary in 'params'"
+
+        if vectors.get('distance') != 'Cosine':
+            return f"Expected distance to be 'Cosine', but got '{vectors.get('distance')}'"
+        if vectors.get('size') not in [384, 1536]:
+            return f"Expected size to be 384 or 1536, but got '{vectors.get('size')}'"
+        if result.get('points_count', 0) == 0:
+            return f"The collection '{collection}' does not contain anything"
+        return None
+
     @dynamic_test(time_limit=0)
-    def test_movie_qa_tool(self):
-        for movie, scene_count, expected_info_regex, expected_keywords_regex in self.test_data:
+    def test1_loading_docs(self):
+        """
+        Test the loading of movie scripts by simulating user input (the movie title),
+        verifying the loaded script info, and checking for expected scene count info.
+        """
+        error = self.check_qdrant_connection()
+        if error:
+            return CheckResult.wrong(error)
+
+        for movie, scene_count, expected_url in self.test_data:
             program = TestedProgram()
-
-            # Start the program (initial output is not checked here).
-            program.start()
-
-            # Simulate the user entering the movie title.
+            program.start()  # Start the program; initial output is not checked here.
             output = program.execute(movie)
 
-            # Check for the expected info line using the provided regex.
-            if not re.search(expected_info_regex, output):
-                return CheckResult.wrong(
-                    f"For movie '{movie}', the expected info about the movie and script URL was not found in the output.\n\n"
-                )
+            expected_info_lines = [
+                f"Loaded script for {movie} from {expected_url}.",
+                f"Found {scene_count} scenes in the script for {movie}.",
+                f"Embedded script for {movie}."
+            ]
+            for line in expected_info_lines:
+                if line not in output:
+                    return CheckResult.wrong(
+                        f"Expected info '{line}' not found in the output for movie {movie}.\n\n"
+                    )
+        return CheckResult.correct()
 
-            # Check for the scene count information.
-            expected_scene_info = f"Found {scene_count} scenes in the script for {movie}."
-            if expected_scene_info not in output:
-                return CheckResult.wrong(
-                    f"For movie '{movie}', expected scene count info '{expected_scene_info}' was not found. Expected {scene_count} scenes. Did you use the correct scene splitter settings?\n"
-                )
+    @dynamic_test(time_limit=0)
+    def test2_check_embeddings(self):
+        """
+        Test the embeddings by verifying that each expected Qdrant collection
+        has valid configuration and content.
+        """
+        error = self.check_qdrant_connection()
+        if error:
+            return CheckResult.wrong(error)
 
-            # Check that at least one of the expected keywords is present.
-            if not re.search(expected_keywords_regex, output, re.IGNORECASE):
-                return CheckResult.wrong(
-                    f"For movie '{movie}', none of the scenes matching the script for the movie were found in the output.\n\n"
-                )
-
-            # Verify that scene markers are printed with "Scene 1:".
-            if "Scene 1:" not in output:
-                return CheckResult.wrong(
-                    f"For movie '{movie}', the marker 'Scene 1:' was not found in the scene output.\n\n"
-                )
+        # For each movie in test_data, derive the expected collection name.
+        for movie, _, _ in self.test_data:
+            collection_name = movie if " " not in movie else movie.replace(" ", "-")
+            error = self.verify_qdrant_collection(collection_name)
+            if error:
+                return CheckResult.wrong(error)
         return CheckResult.correct()
 
 if __name__ == '__main__':
-    MovieQAToolTest().run_tests()
+    RAGTest().run_tests()

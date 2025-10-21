@@ -2,15 +2,12 @@ from config import SCRIPTS_BASE_URL, MOVIES_BASE_URL
 from ingestion import load_documents, chunk_document
 from data import scrap_movies_data
 from utils import clean_text
+from ingestion.embedder import embed_and_store_scenes
 
 
 def main():
     # 1. Collect movie title
     movies = scrap_movies_data(MOVIES_BASE_URL)
-    for index, title in enumerate(movies, start=1):
-        print(f"{index}. {title}")
-
-    print()
 
     # 2. Accept user search for movie
     movie_title = input(">")
@@ -40,9 +37,8 @@ def main():
     # 9. Display the number of split chunks
     print(f"Found {len(chunked_script)} scenes in the script for {movie_title}.")
 
-    # 10. Display each scene chunk line by line
-    for index, scene in enumerate(chunked_script, start=1):
-        print(f"Scene {index}: {scene}")
+    # 10. Use the embeddings model to generate vector representations scene chunks
+    embed_and_store_scenes(chunked_script, movie_title)
 
 
 if __name__ == "__main__":

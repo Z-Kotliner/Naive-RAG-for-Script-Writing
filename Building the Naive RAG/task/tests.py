@@ -1,6 +1,7 @@
-from test.tests import MovieQAToolTest
+from test.tests import RAGTest
 
 
 if __name__ == "__main__":
-    MovieQAToolTest().run_tests()
+    RAGTest().run_tests()
+    
     
