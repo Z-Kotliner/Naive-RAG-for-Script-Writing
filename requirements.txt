@@ -1,5 +1,4 @@
 python-dotenv
-langchain
 langchain-huggingface
 https://github.com/hyperskill/hs-test-python/archive/release.tar.gz
 qdrant-client

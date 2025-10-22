@@ -3,7 +3,7 @@ from ingestion import load_documents, chunk_document
 from data import scrap_movies_data
 from utils import clean_text
 from ingestion.embedder import embed_and_store_scenes
-from generation import rewrite_query
+from generation import rewrite_query, generate_answer
 from retrieval import retrieve_scenes
 
 
@@ -12,7 +12,7 @@ def main():
     movies = scrap_movies_data(MOVIES_BASE_URL)
 
     # 2. Accept user search for movie
-    movie_title = input(">")
+    movie_title = input("Enter a movie title>")
 
     # 3. verify input
     if movie_title == "" or movie_title not in movies.values():
@@ -44,7 +44,7 @@ def main():
 
     # 11. Get user query
     print()
-    query = input(">").lower()
+    query = input("Enter your query>").lower()
 
     # 12. Re-write user query
     rewritten_query = rewrite_query(query)
@@ -56,9 +56,11 @@ def main():
     # 14. Search query
     results = retrieve_scenes(rewritten_query, qdrant_vs)
 
-    # 15. Print results
-    for index, result in enumerate(results, start=1):
-        print(f"Scene {index}: {result.page_content}")
+    # 15. Pass search query + scene docs(context) to LLM
+    final_answer = generate_answer(query, results)
+
+    # Print final LLM answer
+    print(f"Final Answer: \n {final_answer}")
 
 
 if __name__ == "__main__":
