@@ -1,6 +1,7 @@
-# Naive Retrieval-Augmented Generation (RAG) for Script Writing
+## Naive Retrieval-Augmented Generation (RAG) for Script Writing
 
 **Unleash the film writer in you!**  
+
 This project walks you through building a complete **Retrieval-Augmented Generation (RAG)** pipeline using **LangChain** — designed to generate new movie scenes, dialogues, and creative story twists inspired by real movie scripts.
 
 ---
@@ -40,7 +41,7 @@ This project utilizes several tools and libraries to create a complete RAG pipel
 
    ```bash
    git https://github.com/Z-Kotliner/Naive-RAG-for-Script-Writing.git
-   cd AI-Diet-Meal-Planner
+   cd Naive-RAG-for-Script-Writing
 
 
 2. **Create a virtual environment (recommended):**
